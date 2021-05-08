@@ -157,10 +157,12 @@ to authenticate GCP service using Service Account Credential using json file.
     
     Please note that INSERT operation always comes before DELETE. 
     Check your bigquery table to confirm the process is successfully done.
-    <div align="center">
-   <img src="https://drive.google.com/uc?export=view&id=1hhboE9CB93j6uMEWH-TCLGr-Nv5C2dPm">
-    <small align="center">Inserted Message</small>
-   </div><br />
+    
+    
+<div align="center">
+<img src="https://drive.google.com/uc?export=view&id=1hhboE9CB93j6uMEWH-TCLGr-Nv5C2dPm">
+<small align="center">Inserted Message</small>
+</div><br />
 
 ## Unit Tests
 Creating Unit Tests is essential for implementing TDD (Test Driven Development) discipline
