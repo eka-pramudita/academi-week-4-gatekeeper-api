@@ -9,7 +9,7 @@ since accessing production data directly will potentially harm the database perf
 The backend team will send the user activity in JSON format so we have to prepare our API (Application Programming Interface) 
 called Gatekeeper.
 
-## Tech Stack
+## Tech Stacks
 
 ### Flask
 Flask is a lightweight WSGI (Web Server Gateway Interface) web application framework. It is designed to make getting 
