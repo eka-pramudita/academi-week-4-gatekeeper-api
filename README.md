@@ -111,7 +111,7 @@ to authenticate GCP service using Service Account Credential using json file.
 1. Open Git Bash terminal.
 2. Choose directory using `cd` command to the cloned project directory.
 3. I assumed that you already have access to the Google Cloud Platform and set up 
-   billing for your project. Configure your Google Cloud by running gcloud init command. 
+   billing for your project. Configure your Google Cloud by running `gcloud init` command. 
    For step-by-step tutorial please refer this [link](https://www.jhanley.com/google-cloud-understanding-gcloud-configurations/#:~:text=A%20gcloud%20configuration%20is%20a,configuration%20named%20default%20is%20created.&text=The%20creation%20of%20a%20configuration%20can%20be%20accomplished%20with%20gcloud%20or%20manually.).
    
 4. Execute `pubsub.sh` to intiate table, topics and subscription creation.
