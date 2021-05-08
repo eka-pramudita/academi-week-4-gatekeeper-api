@@ -76,13 +76,14 @@ topic_id = "topic-semalam"
 publisher = pubsub_v1.PublisherClient()
 topic_path = publisher.topic_path(project_id, topic_id)
 
-# TODO implement successful and failed report dashboard
+
 def validate_message(request):
     inputs = MessageInputs(request)
     if inputs.validate():
-        # push to pubsub cluster
+        # Send to pubsub cluster
         future = publisher.publish(topic_path, str(request.data).encode("utf-8"))
         return print(future.result())
     else:
+        # Record invalid messages
         invalid_message.append(inputs.errors[0])
         return "Invalid Message: " + str(len(invalid_message))

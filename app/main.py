@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def index() -> str:
-    # transform a dict into an application/json response 
+    # Transform a dict into an application/json response
     return jsonify({"message": "It Works"})
 
 @app.route("/message", methods=['POST'])
@@ -14,6 +14,7 @@ def message() -> str:
     errors = validate_message(request)
     if errors is not None:
         print(errors)
+    # Show the error
     response = {"error": errors}
     return jsonify(response)
 

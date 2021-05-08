@@ -1,4 +1,3 @@
-import time
 from concurrent.futures import TimeoutError
 from google.cloud import pubsub_v1
 import os
@@ -16,11 +15,10 @@ subscriber = pubsub_v1.SubscriberClient()
 # in the form `projects/{project_id}/subscriptions/{subscription_id}`
 subscription_path = subscriber.subscription_path(project_id, subscription_id)
 
-messages = []
-
 def callback(message):
     print(f"Received {message.data}.")
     message.ack()
+    # Normalize message
     str_data = str(message.data).replace("\\", "").replace("rn", "").replace("b\'b\'", "").replace("\'\'", "").replace(" ", "")
     json_data = json.loads(str_data)
     insert = [obj for obj in json_data["activities"] if obj["operation"] == "insert"]
@@ -28,40 +26,71 @@ def callback(message):
 
     # BigQuery section
     client = bigquery.Client()
-    table_id = project_id + ".gatekeeper_api." + insert[0]["table"]
     ## Insert
     for j in range(len(insert)):
+        tables = client.list_tables(project_id + ".gatekeeper_api")
+        bq_table_name = [table.table_id for table in tables]
+        table_id = project_id + ".gatekeeper_api." + insert[j]["table"]
         ins = {}
         for i in range(len(insert[j]["col_names"])):
             ins[insert[j]["col_names"][i]] = insert[j]["col_values"][i]
-        rows_to_insert = [ins]
+        rows_to_insert = [ins] # Rows to be inserted
+        if insert[j]['table'] in bq_table_name:
+            if client.insert_rows_json(table_id, rows_to_insert)[0]['errors'][0]['message'] == 'no such field.':
+                # Handle non-existent column
+                table = client.get_table(table_id)  # Make an API request.
+                new_column = client.insert_rows_json(table_id, rows_to_insert)[0]['errors'][0]['location']
+                col_names = insert[j]["col_names"]
+                col_types = insert[j]["col_types"]
+                original_schema = table.schema
+                new_schema = original_schema[:]  # Creates a copy of the schema.
+                new_schema.append(bigquery.SchemaField(new_column, col_types[col_names.index(new_column)]))
 
-        # TODO still failed when the table does not exist. Fix the issue
-        try:
-            client.insert_rows_json(table_id, rows_to_insert)
-        except:
+                table.schema = new_schema
+                table = client.update_table(table, ["schema"])
+
+                if len(table.schema) == len(original_schema) + 1 == len(new_schema):
+                    print("A new column has been added.")
+                else:
+                    print("The column has not been added.")
+            else:
+                client.insert_rows_json(table_id, rows_to_insert)
+        else:
+            # Handle non-existent table by creating a new one
             schema = []
             for i in range(len(insert[j]["col_names"])):
                 field = bigquery.SchemaField(insert[j]["col_names"][i], insert[j]["col_types"][i])
                 schema.append(field)
-
             table = bigquery.Table(table_id, schema=schema)
-            client.create_table(table)
-        client.insert_rows_json(table_id, rows_to_insert)
-
+            table = client.create_table(table)
+            print(f"Created table {table.project}.{table.dataset_id}.{table.table_id}")
+            errors = client.insert_rows_json(f"{table.project}.{table.dataset_id}.{table.table_id}", rows_to_insert)
+            if errors == []:
+                print("New rows have been added.")
+            else:
+                print("Encountered errors while inserting rows: {}".format(errors))
     ## Delete
-    # TODO still unable to delete rows. Fix query (?)
     for j in range(len(delete)):
-        condition = ' AND '.join([str(delete[j]["old_value"]["col_names"][i])+"="+str(delete[j]["old_value"]["col_values"][i])
-                                  for i in range(len(delete[j]["old_value"]["col_names"]))])
+        tables = client.list_tables(project_id + ".gatekeeper_api")
+        bq_table_name = [table.table_id for table in tables]
         table_id = project_id + ".gatekeeper_api." + delete[j]["table"]
+        # Setting up condition query
+        cond = []
+        for i in range(len(delete[j]["old_value"]["col_names"])):
+            if str(delete[j]["old_value"]["col_types"][i]) == "STRING":
+                where = str(delete[j]["old_value"]["col_names"][i]) + " = '" + str(delete[j]["old_value"]["col_values"][i]) + "'"
+                cond.append(where)
+            else:
+                where = str(delete[j]["old_value"]["col_names"][i]) + " = " + str(delete[j]["old_value"]["col_values"][i])
+                cond.append(where)
+        condition = ' AND '.join(cond)
         delete_query = f""" DELETE FROM `{table_id}` WHERE {condition}"""
-        try:
-            client.get_table(table_id)
-            
-            client.query(delete_query)
-        except:
-            print("Table does not exist, transaction is cancelled")
+        if delete[j]['table'] in bq_table_name:
+            query_job = client.query(delete_query) # Make an API request.
+            query_job.result()
+            print(f"Deletion on {delete[j]['table']} success.")
+        else:
+            print(f"Table does not exist, transaction {j} is cancelled")
 
 
 streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
